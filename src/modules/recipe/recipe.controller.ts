@@ -10,9 +10,10 @@ import {
   UploadedFile,
   UseGuards,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { RecipeService } from './recipe.service';
-import { CreateRecipeDto } from './dto/create-recipe.dto';
+import { CreateRecipeDto, SuggestRecipeDto } from './dto/create-recipe.dto';
 import { CreateNoteDto } from './dto/create-note.dto';
 import { UpdateNoteDto } from './dto/update-note.dto';
 import { UpdateRecipeDto } from './dto/update-recipe.dto';
@@ -24,15 +25,29 @@ import { UserInfo } from 'src/common/decorators/userInfo';
 import { UserPayload } from 'src/common/utils/user-payload';
 import { JwtGuard } from 'src/modules';
 import { RateRecipeDto } from './dto/rate.dto';
+import { RecipeAiService } from './recipe-ai.service';
 
 @UseGuards(JwtGuard)
 @Controller('recipes')
 export class RecipeController {
-  constructor(private readonly recipeService: RecipeService) {}
+  constructor(
+    private readonly recipeService: RecipeService,
+    private readonly aiService: RecipeAiService,
+  ) {}
 
   @Get()
   getAllRecipes(@UserInfo() user: UserPayload) {
     return this.recipeService.getAllRecipes(user.id);
+  }
+
+  @Get('search')
+  searchRecipes(
+    @UserInfo() user: UserPayload,
+    @Param() params,
+    @Body() body,
+    @Query('query') query: string,
+  ) {
+    return this.recipeService.searchRecipes(user.id, query);
   }
 
   @Post()
@@ -160,5 +175,14 @@ export class RecipeController {
   @Get(':recipeId/rating/average')
   getAverageRating(@Param('recipeId', ParseIntPipe) recipeId: number) {
     return this.recipeService.getAverageRating(recipeId);
+  }
+
+  @Post('suggest')
+  async suggestRecipe(@Body() dto: SuggestRecipeDto) {
+    // Join ingredients into a comma-separated string
+    const ingredientsStr = dto.ingredients.join(', ');
+    const prompt = `Suggest a recipe using these ingredients: ${ingredientsStr}`;
+    const suggestion = await this.aiService.generateRecipeSuggestion(prompt);
+    return { suggestion };
   }
 }

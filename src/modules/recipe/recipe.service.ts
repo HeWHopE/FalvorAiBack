@@ -14,6 +14,60 @@ export class RecipeService {
   // --------------------
   // Recipes
   // --------------------
+
+  async searchRecipes(
+    currentUserId: number,
+    query: string,
+  ): Promise<RecipeDto[]> {
+    const recipes = await this.prisma.recipe.findMany({
+      where: {
+        OR: [
+          { name: { contains: query, mode: 'insensitive' } },
+          { description: { contains: query, mode: 'insensitive' } },
+          { instructions: { contains: query, mode: 'insensitive' } },
+          {
+            ingredients: {
+              hasSome: [query], // checks if any ingredient matches exactly
+            },
+          },
+        ],
+      },
+      include: {
+        notes: true,
+        user: true,
+        ratings: true,
+        _count: { select: { ratings: true } },
+      },
+    });
+
+    const ratings = await this.prisma.recipeRating.groupBy({
+      by: ['recipeId'],
+      _avg: { rating: true },
+    });
+
+    return recipes.map((recipe) => {
+      const ratingData = ratings.find((r) => r.recipeId === recipe.id);
+      const userRating =
+        recipe.ratings.find((r) => r.userId === currentUserId)?.rating ?? 0;
+
+      return {
+        id: recipe.id,
+        name: recipe.name,
+        description: recipe.description ?? undefined,
+        ingredients: recipe.ingredients,
+        instructions: recipe.instructions,
+        imageUrl: recipe.imageUrl ?? undefined,
+        userId: recipe.userId,
+        createdAt: recipe.createdAt,
+        updatedAt: recipe.updatedAt,
+        notes: recipe.notes,
+        user: recipe.user,
+        avgRating: ratingData?._avg.rating ?? 0,
+        userRating,
+      };
+    });
+  }
+
   async getAllRecipes(currentUserId: number): Promise<RecipeDto[]> {
     // Fetch recipes including notes, user, and ratings
     const recipes = await this.prisma.recipe.findMany({

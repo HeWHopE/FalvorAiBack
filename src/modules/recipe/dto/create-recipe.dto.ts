@@ -18,3 +18,8 @@ export class CreateRecipeDto {
   @IsOptional()
   imageUrl?: string | null;
 }
+
+// suggest.dto.ts
+export class SuggestRecipeDto {
+  ingredients: string[]; // array of ingredient names
+}
